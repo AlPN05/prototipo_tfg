@@ -197,7 +197,7 @@ class _InventoryViewState extends State<InventoryView> {
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: FilterChip(
-                    label: Text(cat),
+                    label: Text(s.translateCategory(cat)),
                     selected: isSelected,
                     onSelected: (selected) {
                       setState(() {
@@ -281,6 +281,12 @@ class _InventoryViewState extends State<InventoryView> {
                   ),
                 ),
                 _buildStateIcon(garment.state),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  onPressed: () => _confirmDelete(context, inventory, garment, s),
+                  tooltip: s.delete,
+                ),
               ],
             ),
             if (garment.isCountBased) ...[
@@ -343,5 +349,36 @@ class _InventoryViewState extends State<InventoryView> {
         break;
     }
     return Icon(icon, color: color, size: 28);
+  }
+
+  Future<void> _confirmDelete(BuildContext context, InventoryViewModel inventory,
+      Garment garment, AppStrings s) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(s.deleteConfirmTitle),
+        content: Text(s.deleteConfirmContent(1)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(s.cancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(s.confirmDelete),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      inventory.deleteGarment(garment.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(s.garmentDeleted)),
+        );
+      }
+    }
   }
 }

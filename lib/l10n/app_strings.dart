@@ -79,6 +79,16 @@ class AppStrings {
   String get saveChanges => _s('Save Changes', 'Guardar cambios');
   String get state => _s('State', 'Estado');
   String get quantity => _s('Quantity:', 'Cantidad:');
+  String get setInUse => _s('In Use', 'En uso');
+  String get deleteSelected => _s('Delete selected', 'Eliminar seleccionadas');
+  String selectedCount(int n) => _s('$n selected', '$n seleccionadas');
+  String get garmentDeleted => _s('Garment deleted', 'Prenda eliminada');
+  String get garmentsDeleted => _s('Garments deleted', 'Prendas eliminadas');
+  String get deleteConfirmTitle => _s('Delete garments?', '¿Eliminar prendas?');
+  String deleteConfirmContent(int n) =>
+      _s('Delete $n garment(s)?', '¿Eliminar $n prenda(s)?');
+  String get confirmDelete => _s('Delete', 'Eliminar');
+  String get cancelSelection => _s('Cancel', 'Cancelar');
 
   // ─── Outfit Builder ───────────────────────────────────────────────────────
   String get createOutfitTitle => _s('Create Outfit', 'Crear outfit');
