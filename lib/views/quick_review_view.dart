@@ -40,9 +40,9 @@ class QuickReviewView extends StatelessWidget {
                   ),
                   background: _buildSwipeBackground(
                     context,
-                    Icons.water_drop,
-                    'Wash / Use',
-                    Colors.redAccent,
+                    Icons.local_laundry_service,
+                    'To Wash',
+                    Colors.blue,
                     Alignment.centerLeft,
                   ),
                   secondaryBackground: _buildSwipeBackground(
@@ -54,19 +54,17 @@ class QuickReviewView extends StatelessWidget {
                   ),
                   confirmDismiss: (direction) async {
                     if (direction == DismissDirection.endToStart) {
-                      // Swiped left -> In Closet
                       inventory.setPendingState(
                         garment.id,
                         GarmentState.inCloset,
                       );
                     } else {
-                      // Swiped right -> In Wash / Use (let's say InWash for simplicity)
                       inventory.setPendingState(
                         garment.id,
                         GarmentState.inWash,
                       );
                     }
-                    return false; // Don't actually dismiss the widget from the list
+                    return false;
                   },
                   child: Card(
                     elevation: pending != null ? 4 : 0,
@@ -98,7 +96,23 @@ class QuickReviewView extends StatelessWidget {
                             ? '${garment.category} (${garment.quantity} units)'
                             : garment.category,
                       ),
-                      trailing: _buildStateBadge(context, displayState),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildStateBadge(context, displayState),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: Icon(
+                              Icons.edit_outlined,
+                              color: Theme.of(context).colorScheme.primary,
+                              size: 20,
+                            ),
+                            tooltip: 'Edit',
+                            onPressed: () =>
+                                _showEditSheet(context, inventory, garment),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -118,6 +132,179 @@ class QuickReviewView extends StatelessWidget {
               label: const Text('Confirm Changes'),
             )
           : null,
+    );
+  }
+
+  void _showEditSheet(
+    BuildContext context,
+    InventoryViewModel inventory,
+    Garment garment,
+  ) {
+    final nameController = TextEditingController(text: garment.name);
+    final categoryController = TextEditingController(text: garment.category);
+    final colorController = TextEditingController(text: garment.color);
+    bool isCountBased = garment.isCountBased;
+    int quantity = garment.quantity;
+    GarmentState selectedState = garment.state;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                left: 24,
+                right: 24,
+                top: 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Edit Garment',
+                      style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Name',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: categoryController,
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: colorController,
+                      decoration: const InputDecoration(
+                        labelText: 'Color',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // State selector
+                    Text(
+                      'State',
+                      style: Theme.of(ctx).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    SegmentedButton<GarmentState>(
+                      segments: const [
+                        ButtonSegment(
+                          value: GarmentState.inCloset,
+                          label: Text('Closet'),
+                          icon: Icon(Icons.checkroom, size: 16),
+                        ),
+                        ButtonSegment(
+                          value: GarmentState.inUse,
+                          label: Text('In Use'),
+                          icon: Icon(Icons.person, size: 16),
+                        ),
+                        ButtonSegment(
+                          value: GarmentState.inWash,
+                          label: Text('Washing'),
+                          icon: Icon(Icons.local_laundry_service, size: 16),
+                        ),
+                      ],
+                      selected: {selectedState},
+                      onSelectionChanged: (s) =>
+                          setModalState(() => selectedState = s.first),
+                    ),
+                    const SizedBox(height: 16),
+                    SwitchListTile(
+                      title: const Text('Manage by quantity'),
+                      value: isCountBased,
+                      onChanged: (val) =>
+                          setModalState(() => isCountBased = val),
+                    ),
+                    if (isCountBased)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Quantity:'),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.remove),
+                                onPressed: quantity > 1
+                                    ? () => setModalState(() => quantity--)
+                                    : null,
+                              ),
+                              Text(
+                                '$quantity',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.add),
+                                onPressed: () =>
+                                    setModalState(() => quantity++),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (nameController.text.isNotEmpty &&
+                              categoryController.text.isNotEmpty) {
+                            inventory.updateGarment(
+                              garment.copyWith(
+                                name: nameController.text,
+                                category: categoryController.text,
+                                color: colorController.text.isEmpty
+                                    ? garment.color
+                                    : colorController.text,
+                                isCountBased: isCountBased,
+                                quantity: quantity,
+                                state: selectedState,
+                              ),
+                            );
+                            Navigator.pop(ctx);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              Theme.of(ctx).colorScheme.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Save Changes'),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -167,7 +354,7 @@ class QuickReviewView extends StatelessWidget {
         label = 'In Use';
         break;
       case GarmentState.inWash:
-        color = Colors.redAccent;
+        color = Colors.blue; // ← azul en vez de rojo
         label = 'In Wash';
         break;
     }

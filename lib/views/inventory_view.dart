@@ -3,6 +3,147 @@ import 'package:provider/provider.dart';
 import '../viewmodels/inventory_viewmodel.dart';
 import '../models/garment.dart';
 
+/// Shows the Add Garment bottom sheet. Can be called from any screen.
+void showAddGarmentSheet(BuildContext context, InventoryViewModel inventory) {
+  final nameController = TextEditingController();
+  final categoryController = TextEditingController();
+  final colorController = TextEditingController();
+  bool isCountBased = false;
+  int quantity = 1;
+
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 24,
+              right: 24,
+              top: 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Add New Garment',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Name',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: categoryController,
+                  decoration: const InputDecoration(
+                    labelText: 'Category (e.g., T-Shirts)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: colorController,
+                  decoration: const InputDecoration(
+                    labelText: 'Color',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text('Manage by quantity (for basics)'),
+                  value: isCountBased,
+                  onChanged: (val) {
+                    setModalState(() {
+                      isCountBased = val;
+                    });
+                  },
+                ),
+                if (isCountBased)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Initial Quantity:'),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.remove),
+                            onPressed: quantity > 1
+                                ? () => setModalState(() => quantity--)
+                                : null,
+                          ),
+                          Text(
+                            '$quantity',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add),
+                            onPressed: () => setModalState(() => quantity++),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (nameController.text.isNotEmpty &&
+                          categoryController.text.isNotEmpty) {
+                        inventory.addGarment(
+                          Garment(
+                            id: DateTime.now().millisecondsSinceEpoch
+                                .toString(),
+                            name: nameController.text,
+                            category: categoryController.text,
+                            color: colorController.text.isEmpty
+                                ? 'Unknown'
+                                : colorController.text,
+                            isCountBased: isCountBased,
+                            quantity: isCountBased ? quantity : 1,
+                            state: GarmentState.inCloset,
+                          ),
+                        );
+                        Navigator.pop(context);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Save Item'),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
 class InventoryView extends StatefulWidget {
   const InventoryView({Key? key}) : super(key: key);
 
@@ -76,7 +217,7 @@ class _InventoryViewState extends State<InventoryView> {
               },
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddGarmentDialog(context, inventory),
+        onPressed: () => showAddGarmentSheet(context, inventory),
         child: const Icon(Icons.add),
       ),
     );
@@ -179,141 +320,10 @@ class _InventoryViewState extends State<InventoryView> {
         color = Colors.orange;
         break;
       case GarmentState.inWash:
-        icon = Icons.water_drop;
-        color = Colors.redAccent;
+        icon = Icons.local_laundry_service;
+        color = Colors.blue;  // ← azul en vez de rojo
         break;
     }
     return Icon(icon, color: color, size: 28);
-  }
-
-  void _showAddGarmentDialog(
-    BuildContext context,
-    InventoryViewModel inventory,
-  ) {
-    final nameController = TextEditingController();
-    final categoryController = TextEditingController();
-    bool isCountBased = false;
-    int quantity = 1;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 24,
-                right: 24,
-                top: 24,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Add New Garment',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Name',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: categoryController,
-                    decoration: const InputDecoration(
-                      labelText: 'Category (e.g., T-Shirts)',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SwitchListTile(
-                    title: const Text('Manage by quantity (for basics)'),
-                    value: isCountBased,
-                    onChanged: (val) {
-                      setModalState(() {
-                        isCountBased = val;
-                      });
-                    },
-                  ),
-                  if (isCountBased)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Initial Quantity:'),
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove),
-                              onPressed: quantity > 1
-                                  ? () => setModalState(() => quantity--)
-                                  : null,
-                            ),
-                            Text(
-                              '$quantity',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add),
-                              onPressed: () => setModalState(() => quantity++),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        if (nameController.text.isNotEmpty &&
-                            categoryController.text.isNotEmpty) {
-                          inventory.addGarment(
-                            Garment(
-                              id: DateTime.now().millisecondsSinceEpoch
-                                  .toString(),
-                              name: nameController.text,
-                              category: categoryController.text,
-                              isCountBased: isCountBased,
-                              quantity: isCountBased ? quantity : 1,
-                              state: GarmentState.inCloset,
-                            ),
-                          );
-                          Navigator.pop(context);
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text('Save Item'),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
   }
 }

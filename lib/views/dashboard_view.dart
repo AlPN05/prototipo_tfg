@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../viewmodels/inventory_viewmodel.dart';
 import '../viewmodels/settings_viewmodel.dart';
 import '../models/app_config.dart';
+import 'inventory_view.dart';
+import 'outfit_builder_view.dart';
 
 class DashboardView extends StatelessWidget {
   const DashboardView({Key? key}) : super(key: key);
@@ -25,7 +27,7 @@ class DashboardView extends StatelessWidget {
               const SizedBox(height: 32),
               _buildVisualCloset(context, settings.closetModel),
               const SizedBox(height: 32),
-              _buildQuickActions(context),
+              _buildQuickActions(context, inventory),
             ],
           ),
         ),
@@ -78,7 +80,7 @@ class DashboardView extends StatelessWidget {
               context,
               title: 'In Wash',
               value: inventory.inWashCount.toString(),
-              icon: Icons.water_drop_outlined,
+              icon: Icons.local_laundry_service,
             ),
           ],
         ),
@@ -237,7 +239,7 @@ class DashboardView extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickActions(BuildContext context) {
+  Widget _buildQuickActions(BuildContext context, InventoryViewModel inventory) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -248,18 +250,47 @@ class DashboardView extends StatelessWidget {
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
-        Row(
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
           children: [
-            _buildActionChip(context, 'Add Item', Icons.add),
-            const SizedBox(width: 12),
-            _buildActionChip(context, 'Sort', Icons.sort),
+            _buildActionChip(
+              context,
+              'Add Item',
+              Icons.add,
+              onPressed: () => showAddGarmentSheet(context, inventory),
+            ),
+            _buildActionChip(
+              context,
+              'Create Outfit',
+              Icons.style_outlined,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const OutfitBuilderView(),
+                  ),
+                );
+              },
+            ),
+            _buildActionChip(
+              context,
+              'Sort',
+              Icons.sort,
+              onPressed: () {},
+            ),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildActionChip(BuildContext context, String label, IconData icon) {
+  Widget _buildActionChip(
+    BuildContext context,
+    String label,
+    IconData icon, {
+    required VoidCallback onPressed,
+  }) {
     return ActionChip(
       elevation: 0,
       pressElevation: 0,
@@ -274,9 +305,7 @@ class DashboardView extends StatelessWidget {
         color: Theme.of(context).colorScheme.primary,
       ),
       label: Text(label),
-      onPressed: () {
-        // Just empty actions for the prototype dashboard
-      },
+      onPressed: onPressed,
     );
   }
 }
