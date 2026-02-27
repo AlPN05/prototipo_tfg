@@ -1,32 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_strings.dart';
 import '../viewmodels/inventory_viewmodel.dart';
 import '../models/garment.dart';
 
+/// Vista de revisión rápida: permite revisar y cambiar el estado
+/// de las prendas mediante gestos de deslizamiento.
 class QuickReviewView extends StatelessWidget {
-  const QuickReviewView({Key? key}) : super(key: key);
+  const QuickReviewView({super.key});
 
   @override
   Widget build(BuildContext context) {
     final inventory = context.watch<InventoryViewModel>();
     final garments = inventory.garments;
+    final s = AppStrings.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Quick Review'),
+        title: Text(s.quickReview),
         actions: [
+          // Botón para descartar todos los cambios pendientes
           if (inventory.hasPendingChanges)
             IconButton(
               icon: const Icon(Icons.clear_all),
               onPressed: () => inventory.clearPendingStates(),
-              tooltip: 'Clear pending changes',
+              tooltip: s.clearPending,
             ),
         ],
       ),
       body: garments.isEmpty
-          ? const Center(child: Text('No items to review'))
+          ? Center(child: Text(s.noItemsToReview))
           : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               itemCount: garments.length,
               itemBuilder: (context, index) {
                 final garment = garments[index];
@@ -35,43 +41,45 @@ class QuickReviewView extends StatelessWidget {
                 final displayState = pending ?? currentState;
 
                 return Dismissible(
+                  // Clave única que incluye el estado pendiente para forzar rebuild
                   key: ValueKey(
                     '${garment.id}_${pending?.toString() ?? currentState.toString()}',
                   ),
+                  // Deslizar a la derecha → marcar para lavar (azul)
                   background: _buildSwipeBackground(
                     context,
                     Icons.local_laundry_service,
-                    'To Wash',
+                    s.toWash,
                     Colors.blue,
                     Alignment.centerLeft,
                   ),
+                  // Deslizar a la izquierda → marcar en armario (verde)
                   secondaryBackground: _buildSwipeBackground(
                     context,
                     Icons.checkroom,
-                    'In Closet',
+                    s.inCloset,
                     Colors.green,
                     Alignment.centerRight,
                   ),
                   confirmDismiss: (direction) async {
                     if (direction == DismissDirection.endToStart) {
+                      // Derecha → izquierda: volver al armario
                       inventory.setPendingState(
-                        garment.id,
-                        GarmentState.inCloset,
-                      );
+                          garment.id, GarmentState.inCloset);
                     } else {
+                      // Izquierda → derecha: enviar a lavar
                       inventory.setPendingState(
-                        garment.id,
-                        GarmentState.inWash,
-                      );
+                          garment.id, GarmentState.inWash);
                     }
-                    return false;
+                    return false; // No eliminar el widget de la lista
                   },
                   child: Card(
                     elevation: pending != null ? 4 : 0,
                     color: pending != null
-                        ? Theme.of(
-                            context,
-                          ).colorScheme.primary.withOpacity(0.05)
+                        ? Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.05)
                         : Theme.of(context).cardTheme.color,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -84,32 +92,30 @@ class QuickReviewView extends StatelessWidget {
                     ),
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 8,
-                      ),
-                      title: Text(
-                        garment.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
+                          horizontal: 20, vertical: 8),
+                      title: Text(garment.name,
+                          style:
+                              const TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text(
                         garment.isCountBased
-                            ? '${garment.category} (${garment.quantity} units)'
-                            : garment.category,
+                            ? '${s.translateCategory(garment.category)} (${garment.quantity} ${s.units})'
+                            : s.translateCategory(garment.category),
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _buildStateBadge(context, displayState),
-                          const SizedBox(width: 8),
+                          _buildStateBadge(context, displayState, s),
+                          const SizedBox(width: 4),
+                          // Botón de editar prenda
                           IconButton(
                             icon: Icon(
                               Icons.edit_outlined,
                               color: Theme.of(context).colorScheme.primary,
                               size: 20,
                             ),
-                            tooltip: 'Edit',
+                            tooltip: s.edit,
                             onPressed: () =>
-                                _showEditSheet(context, inventory, garment),
+                                _showEditSheet(context, inventory, garment, s),
                           ),
                         ],
                       ),
@@ -118,31 +124,32 @@ class QuickReviewView extends StatelessWidget {
                 );
               },
             ),
+      // FAB de confirmación: solo visible cuando hay cambios pendientes
       floatingActionButton: inventory.hasPendingChanges
           ? FloatingActionButton.extended(
               onPressed: () {
                 inventory.syncPendingChanges();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Changes synchronized successfully'),
-                  ),
+                  SnackBar(content: Text(s.syncSuccess)),
                 );
               },
               icon: const Icon(Icons.sync),
-              label: const Text('Confirm Changes'),
+              label: Text(s.confirmChanges),
             )
           : null,
     );
   }
 
+  /// Bottom sheet para editar los datos de una prenda existente.
   void _showEditSheet(
     BuildContext context,
     InventoryViewModel inventory,
     Garment garment,
+    AppStrings s,
   ) {
-    final nameController = TextEditingController(text: garment.name);
-    final categoryController = TextEditingController(text: garment.category);
-    final colorController = TextEditingController(text: garment.color);
+    final nameCtrl = TextEditingController(text: garment.name);
+    final categoryCtrl = TextEditingController(text: garment.category);
+    final colorCtrl = TextEditingController(text: garment.color);
     bool isCountBased = garment.isCountBased;
     int quantity = garment.quantity;
     GarmentState selectedState = garment.state;
@@ -168,68 +175,63 @@ class QuickReviewView extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Edit Garment',
-                      style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    Text(s.editGarment,
+                        style: Theme.of(ctx)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 24),
                     TextField(
-                      controller: nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Name',
-                        border: OutlineInputBorder(),
-                      ),
+                      controller: nameCtrl,
+                      decoration: InputDecoration(
+                          labelText: s.name,
+                          border: const OutlineInputBorder()),
                     ),
                     const SizedBox(height: 16),
                     TextField(
-                      controller: categoryController,
-                      decoration: const InputDecoration(
-                        labelText: 'Category',
-                        border: OutlineInputBorder(),
-                      ),
+                      controller: categoryCtrl,
+                      decoration: InputDecoration(
+                          labelText: s.category,
+                          border: const OutlineInputBorder()),
                     ),
                     const SizedBox(height: 16),
                     TextField(
-                      controller: colorController,
-                      decoration: const InputDecoration(
-                        labelText: 'Color',
-                        border: OutlineInputBorder(),
-                      ),
+                      controller: colorCtrl,
+                      decoration: InputDecoration(
+                          labelText: s.color,
+                          border: const OutlineInputBorder()),
                     ),
                     const SizedBox(height: 16),
-                    // State selector
-                    Text(
-                      'State',
-                      style: Theme.of(ctx).textTheme.labelLarge,
-                    ),
+                    // Selector de estado con botones segmentados
+                    Text(s.state,
+                        style: Theme.of(ctx).textTheme.labelLarge),
                     const SizedBox(height: 8),
                     SegmentedButton<GarmentState>(
-                      segments: const [
+                      segments: [
                         ButtonSegment(
                           value: GarmentState.inCloset,
-                          label: Text('Closet'),
-                          icon: Icon(Icons.checkroom, size: 16),
+                          label: Text(s.closet),
+                          icon: const Icon(Icons.checkroom, size: 16),
                         ),
                         ButtonSegment(
                           value: GarmentState.inUse,
-                          label: Text('In Use'),
-                          icon: Icon(Icons.person, size: 16),
+                          label: Text(s.inUseState),
+                          icon: const Icon(Icons.person, size: 16),
                         ),
                         ButtonSegment(
                           value: GarmentState.inWash,
-                          label: Text('Washing'),
-                          icon: Icon(Icons.local_laundry_service, size: 16),
+                          label: Text(s.washing),
+                          icon: const Icon(Icons.local_laundry_service,
+                              size: 16),
                         ),
                       ],
                       selected: {selectedState},
-                      onSelectionChanged: (s) =>
-                          setModalState(() => selectedState = s.first),
+                      onSelectionChanged: (sel) =>
+                          setModalState(() => selectedState = sel.first),
                     ),
                     const SizedBox(height: 16),
                     SwitchListTile(
-                      title: const Text('Manage by quantity'),
+                      title: Text(s.manageByQuantity),
                       value: isCountBased,
                       onChanged: (val) =>
                           setModalState(() => isCountBased = val),
@@ -238,7 +240,7 @@ class QuickReviewView extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Quantity:'),
+                          Text(s.quantity),
                           Row(
                             children: [
                               IconButton(
@@ -247,13 +249,10 @@ class QuickReviewView extends StatelessWidget {
                                     ? () => setModalState(() => quantity--)
                                     : null,
                               ),
-                              Text(
-                                '$quantity',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                              Text('$quantity',
+                                  style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold)),
                               IconButton(
                                 icon: const Icon(Icons.add),
                                 onPressed: () =>
@@ -269,15 +268,15 @@ class QuickReviewView extends StatelessWidget {
                       height: 50,
                       child: ElevatedButton(
                         onPressed: () {
-                          if (nameController.text.isNotEmpty &&
-                              categoryController.text.isNotEmpty) {
+                          if (nameCtrl.text.isNotEmpty &&
+                              categoryCtrl.text.isNotEmpty) {
                             inventory.updateGarment(
                               garment.copyWith(
-                                name: nameController.text,
-                                category: categoryController.text,
-                                color: colorController.text.isEmpty
+                                name: nameCtrl.text,
+                                category: categoryCtrl.text,
+                                color: colorCtrl.text.isEmpty
                                     ? garment.color
-                                    : colorController.text,
+                                    : colorCtrl.text,
                                 isCountBased: isCountBased,
                                 quantity: quantity,
                                 state: selectedState,
@@ -291,10 +290,9 @@ class QuickReviewView extends StatelessWidget {
                               Theme.of(ctx).colorScheme.primary,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                              borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: const Text('Save Changes'),
+                        child: Text(s.saveChanges),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -308,6 +306,7 @@ class QuickReviewView extends StatelessWidget {
     );
   }
 
+  /// Fondo del gesto de deslizamiento (lavar o archivar).
   Widget _buildSwipeBackground(
     BuildContext context,
     IconData icon,
@@ -318,9 +317,7 @@ class QuickReviewView extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(16),
-      ),
+          color: color, borderRadius: BorderRadius.circular(16)),
       padding: const EdgeInsets.symmetric(horizontal: 24),
       alignment: alignment,
       child: Column(
@@ -328,51 +325,44 @@ class QuickReviewView extends StatelessWidget {
         children: [
           Icon(icon, color: Colors.white, size: 28),
           const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text(label,
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
 
-  Widget _buildStateBadge(BuildContext context, GarmentState state) {
+  /// Badge de color que indica el estado actual o pendiente de la prenda.
+  Widget _buildStateBadge(
+      BuildContext context, GarmentState state, AppStrings s) {
     Color color;
     String label;
 
     switch (state) {
       case GarmentState.inCloset:
         color = Colors.green;
-        label = 'In Closet';
+        label = s.inCloset;
         break;
       case GarmentState.inUse:
         color = Colors.orange;
-        label = 'In Use';
+        label = s.inUseState;
         break;
       case GarmentState.inWash:
-        color = Colors.blue; // ← azul en vez de rojo
-        label = 'In Wash';
+        color = Colors.blue; // azul en vez de rojo
+        label = s.inWashState;
         break;
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(30),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.bold,
-          fontSize: 12,
-        ),
-      ),
+      child: Text(label,
+          style: TextStyle(
+              color: color, fontWeight: FontWeight.bold, fontSize: 12)),
     );
   }
 }

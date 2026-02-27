@@ -1,28 +1,35 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_strings.dart';
 import 'dashboard_view.dart';
 import 'quick_review_view.dart';
 import 'inventory_view.dart';
 import 'settings_view.dart';
 
+/// Pantalla raíz de la aplicación con navegación inferior entre las 4 secciones.
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  /// Índice de la pestaña activa.
   int _currentIndex = 0;
 
-  final List<Widget> _pages = [
-    const DashboardView(),
-    const QuickReviewView(),
-    const InventoryView(),
-    const SettingsView(),
+  /// Lista de páginas disponibles (orden = índice en la barra inferior).
+  final List<Widget> _pages = const [
+    DashboardView(),
+    QuickReviewView(),
+    InventoryView(),
+    SettingsView(),
   ];
 
   @override
   Widget build(BuildContext context) {
+    // Cargamos los strings del idioma activo para las etiquetas de navegación
+    final s = AppStrings.of(context);
+
     return Scaffold(
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
@@ -32,7 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 20,
               offset: const Offset(0, -5),
             ),
@@ -45,22 +52,22 @@ class _HomeScreenState extends State<HomeScreen> {
               _currentIndex = index;
             });
           },
-          items: const [
+          items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard_rounded),
-              label: 'Dashboard',
+              icon: const Icon(Icons.dashboard_rounded),
+              label: s.navDashboard,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.check_circle_outline),
-              label: 'Quick Review',
+              icon: const Icon(Icons.check_circle_outline),
+              label: s.navQuickReview,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.inventory_2_outlined),
-              label: 'Inventory',
+              icon: const Icon(Icons.inventory_2_outlined),
+              label: s.navInventory,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined),
-              label: 'Settings',
+              icon: const Icon(Icons.settings_outlined),
+              label: s.navSettings,
             ),
           ],
         ),

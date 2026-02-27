@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'viewmodels/inventory_viewmodel.dart';
+import 'viewmodels/outfit_viewmodel.dart';
 import 'viewmodels/settings_viewmodel.dart';
 import 'theme/app_theme.dart';
 import 'views/home_screen.dart';
@@ -10,6 +11,7 @@ void main() {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => InventoryViewModel()),
+        ChangeNotifierProvider(create: (_) => OutfitViewModel()),
         ChangeNotifierProvider(create: (_) => SettingsViewModel()),
       ],
       child: const SmartClosetApp(),

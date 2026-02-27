@@ -1,26 +1,32 @@
+// Vista para construir un outfit personalizado combinando prendas del inventario.
+// Al guardar, el outfit queda registrado en OutfitViewModel y se navega a la lista.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_strings.dart';
 import '../viewmodels/inventory_viewmodel.dart';
+import '../viewmodels/outfit_viewmodel.dart';
 import '../models/garment.dart';
+import '../models/outfit.dart';
+import 'saved_outfits_view.dart';
 
 class OutfitBuilderView extends StatefulWidget {
-  const OutfitBuilderView({Key? key}) : super(key: key);
+  const OutfitBuilderView({super.key});
 
   @override
   State<OutfitBuilderView> createState() => _OutfitBuilderViewState();
 }
 
 class _OutfitBuilderViewState extends State<OutfitBuilderView> {
-  // Outfit slots
-  static const List<Map<String, dynamic>> _slots = [
-    {'label': 'Top',       'icon': Icons.dry_cleaning},
-    {'label': 'Bottom',    'icon': Icons.airline_seat_legroom_normal},
-    {'label': 'Footwear',  'icon': Icons.airline_seat_flat},
-    {'label': 'Outerwear', 'icon': Icons.umbrella},
-    {'label': 'Accessory', 'icon': Icons.watch},
-  ];
+  /// Slots de prenda única (máximo 1 prenda por slot).
+  final Map<String, Garment?> _single = {};
 
-  final Map<String, Garment?> _selected = {};
+  /// Slots de prenda múltiple (pueden tener varias prendas).
+  final Map<String, List<Garment>> _multi = {
+    'acc': [],
+    'underwear': [],
+  };
+
+  /// Nombre que el usuario da al outfit.
   final TextEditingController _nameController = TextEditingController();
 
   @override
@@ -29,14 +35,63 @@ class _OutfitBuilderViewState extends State<OutfitBuilderView> {
     super.dispose();
   }
 
+  // ── Categorías permitidas por slot ──────────────────────────────────────────
+
+  static const Map<String, List<String>> _slotCategories = {
+    'top': [
+      'T-Shirts', 'Shirts', 'Polos', 'Tank Tops',
+      'Sweaters', 'Hoodies', 'Jumpers', 'Sportswear', 'Sleepwear',
+    ],
+    'bottom': [
+      'Pants', 'Jeans', 'Shorts', 'Skirts', 'Sportswear', 'Sleepwear',
+    ],
+    'footwear': [
+      'Sneakers', 'Shoes', 'Boots', 'Sandals', 'Socks',
+    ],
+    'outer': [
+      'Outerwear', 'Jackets', 'Suits',
+    ],
+    'acc': [
+      'Belts', 'Hats', 'Scarves', 'Gloves', 'Accessories', 'Bags',
+    ],
+    'underwear': [
+      'Underwear', 'Socks',
+    ],
+  };
+
+  // ── Definición de slots ─────────────────────────────────────────────────────
+
+  List<Map<String, dynamic>> _buildSingleSlots(AppStrings s) => [
+        {'key': 'top',      'label': s.slotTop,       'icon': Icons.dry_cleaning},
+        {'key': 'bottom',   'label': s.slotBottom,    'icon': Icons.airline_seat_legroom_normal},
+        {'key': 'footwear', 'label': s.slotFootwear,  'icon': Icons.airline_seat_flat},
+        {'key': 'outer',    'label': s.slotOuterwear, 'icon': Icons.umbrella},
+      ];
+
+  List<Map<String, dynamic>> _buildMultiSlots(AppStrings s) => [
+        {'key': 'acc',       'label': s.slotAccessory, 'icon': Icons.watch},
+        {'key': 'underwear', 'label': s.slotUnderwear, 'icon': Icons.dry_cleaning_outlined},
+      ];
+
+  // ── Comprobación de si hay algo seleccionado ────────────────────────────────
+
+  bool get _hasAny =>
+      _single.values.any((g) => g != null) ||
+      _multi.values.any((list) => list.isNotEmpty);
+
+  // ── Build principal ─────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final inventory = context.watch<InventoryViewModel>();
+    final s = AppStrings.of(context);
+    final singleSlots = _buildSingleSlots(s);
+    final multiSlots  = _buildMultiSlots(s);
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Outfit'),
+        title: Text(s.createOutfitTitle),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
@@ -47,138 +102,112 @@ class _OutfitBuilderViewState extends State<OutfitBuilderView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Outfit name field
+            // Campo para el nombre del outfit
             TextField(
               controller: _nameController,
               decoration: InputDecoration(
-                labelText: 'Outfit name',
-                hintText: 'e.g. Monday casual',
+                labelText: s.outfitName,
+                hintText: s.outfitNameHint,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                    borderRadius: BorderRadius.circular(12)),
                 prefixIcon: const Icon(Icons.label_outline),
               ),
             ),
             const SizedBox(height: 32),
-            Text(
-              'Select pieces',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text(s.selectPieces,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            // Slot list
-            ..._slots.map((slot) {
-              final label = slot['label'] as String;
-              final icon = slot['icon'] as IconData;
-              final chosen = _selected[label];
-              return _buildSlotTile(
+
+            // ── Slots de prenda única ─────────────────────────────────────
+            ...singleSlots.map((slot) {
+              final key = slot['key'] as String;
+              return _buildSingleSlotTile(
                 context,
-                label: label,
-                icon: icon,
-                chosen: chosen,
+                slotKey:   key,
+                label:     slot['label'] as String,
+                icon:      slot['icon'] as IconData,
+                chosen:    _single[key],
                 inventory: inventory,
+                s:         s,
               );
             }),
+
+            const SizedBox(height: 8),
+
+            // ── Slots de prenda múltiple ──────────────────────────────────
+            ...multiSlots.map((slot) {
+              final key = slot['key'] as String;
+              return _buildMultiSlotSection(
+                context,
+                slotKey:   key,
+                label:     slot['label'] as String,
+                icon:      slot['icon'] as IconData,
+                items:     _multi[key]!,
+                inventory: inventory,
+                s:         s,
+              );
+            }),
+
             const SizedBox(height: 32),
-            // Outfit preview card
-            if (_selected.values.any((g) => g != null)) ...[
-              Text(
-                'Outfit Preview',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+
+            // ── Vista previa ──────────────────────────────────────────────
+            if (_hasAny) ...[
+              Text(s.outfitPreview,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      colorScheme.primary.withOpacity(0.08),
-                      colorScheme.secondary.withOpacity(0.08),
-                    ],
-                  ),
+                  gradient: LinearGradient(colors: [
+                    colorScheme.primary.withValues(alpha: 0.08),
+                    colorScheme.secondary.withValues(alpha: 0.08),
+                  ]),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: colorScheme.primary.withOpacity(0.2),
-                  ),
+                      color: colorScheme.primary.withValues(alpha: 0.2)),
                 ),
                 child: Column(
-                  children: _slots
-                      .where((s) => _selected[s['label']] != null)
-                      .map((s) {
-                    final g = _selected[s['label']]!;
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Icon(s['icon'] as IconData,
-                              size: 18, color: colorScheme.primary),
-                          const SizedBox(width: 12),
-                          Text(
-                            '${s['label']}: ',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 13,
-                            ),
-                          ),
-                          Text(
-                            g.name,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              g.color,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
+                  children: [
+                    // Prendas únicas seleccionadas
+                    ...singleSlots
+                        .where((sl) => _single[sl['key']] != null)
+                        .map((sl) {
+                      final g = _single[sl['key']]!;
+                      return _buildPreviewRow(
+                          context, sl['icon'] as IconData, sl['label'] as String, g, s, colorScheme);
+                    }),
+                    // Prendas múltiples seleccionadas
+                    ...multiSlots.expand((sl) {
+                      final items = _multi[sl['key']]!;
+                      return items.map((g) => _buildPreviewRow(
+                          context, sl['icon'] as IconData, sl['label'] as String, g, s, colorScheme));
+                    }),
+                  ],
                 ),
               ),
               const SizedBox(height: 24),
             ],
-            // Save button
+
+            // ── Botón guardar ─────────────────────────────────────────────
             SizedBox(
               width: double.infinity,
               height: 52,
               child: ElevatedButton.icon(
-                onPressed: _selected.values.any((g) => g != null)
-                    ? () {
-                        final name = _nameController.text.trim().isEmpty
-                            ? 'My Outfit'
-                            : _nameController.text.trim();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Outfit "$name" saved! ✨'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                        Navigator.pop(context);
-                      }
-                    : null,
+                onPressed: _hasAny ? () => _saveOutfit(context, s) : null,
                 icon: const Icon(Icons.save_outlined),
-                label: const Text('Save Outfit'),
+                label: Text(s.saveOutfit),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colorScheme.primary,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+                      borderRadius: BorderRadius.circular(14)),
                 ),
               ),
             ),
@@ -189,12 +218,90 @@ class _OutfitBuilderViewState extends State<OutfitBuilderView> {
     );
   }
 
-  Widget _buildSlotTile(
+  // ── Vista previa: fila de prenda ────────────────────────────────────────────
+
+  Widget _buildPreviewRow(
+    BuildContext context,
+    IconData icon,
+    String slotLabel,
+    Garment g,
+    AppStrings s,
+    ColorScheme colorScheme,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: colorScheme.primary),
+          const SizedBox(width: 12),
+          Text('$slotLabel: ',
+              style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+          Expanded(
+            child: Text(g.name,
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(s.translateColor(g.color),
+                style: TextStyle(fontSize: 11, color: colorScheme.primary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Guardar outfit ──────────────────────────────────────────────────────────
+
+  void _saveOutfit(BuildContext context, AppStrings s) {
+    final name = _nameController.text.trim().isEmpty
+        ? s.myOutfit
+        : _nameController.text.trim();
+
+    // Construimos el mapa unificado Map<String, List<Garment>>
+    final Map<String, List<Garment>> slots = {};
+    for (final entry in _single.entries) {
+      if (entry.value != null) slots[entry.key] = [entry.value!];
+    }
+    for (final entry in _multi.entries) {
+      if (entry.value.isNotEmpty) slots[entry.key] = List.from(entry.value);
+    }
+
+    context.read<OutfitViewModel>().addOutfit(
+          Outfit(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            name: name,
+            slots: slots,
+          ),
+        );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(s.outfitSaved(name)),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    // Volver atrás y abrir la vista de outfits guardados para ver el resultado
+    Navigator.pop(context);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SavedOutfitsView()),
+    );
+  }
+
+  // ── Tile de slot de prenda única ────────────────────────────────────────────
+
+  Widget _buildSingleSlotTile(
     BuildContext context, {
+    required String slotKey,
     required String label,
     required IconData icon,
     required Garment? chosen,
     required InventoryViewModel inventory,
+    required AppStrings s,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     return Padding(
@@ -202,45 +309,39 @@ class _OutfitBuilderViewState extends State<OutfitBuilderView> {
       child: Material(
         borderRadius: BorderRadius.circular(16),
         color: chosen != null
-            ? colorScheme.primary.withOpacity(0.07)
+            ? colorScheme.primary.withValues(alpha: 0.07)
             : Theme.of(context).colorScheme.surface,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () => _pickGarment(context, label, inventory),
+          onTap: () => _pickSingle(context, slotKey, label, inventory, s),
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: chosen != null
-                        ? colorScheme.primary.withOpacity(0.15)
-                        : Colors.grey.withOpacity(0.1),
+                        ? colorScheme.primary.withValues(alpha: 0.15)
+                        : Colors.grey.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    icon,
-                    size: 22,
-                    color: chosen != null ? colorScheme.primary : Colors.grey,
-                  ),
+                  child: Icon(icon,
+                      size: 22,
+                      color: chosen != null ? colorScheme.primary : Colors.grey),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(label,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[600],
+                              fontSize: 12)),
                       Text(
-                        label,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[600],
-                          fontSize: 12,
-                        ),
-                      ),
-                      Text(
-                        chosen != null ? chosen.name : 'Tap to select…',
+                        chosen != null ? chosen.name : s.tapToSelect,
                         style: TextStyle(
                           fontWeight: chosen != null
                               ? FontWeight.bold
@@ -248,6 +349,11 @@ class _OutfitBuilderViewState extends State<OutfitBuilderView> {
                           color: chosen != null ? null : Colors.grey,
                         ),
                       ),
+                      if (chosen != null)
+                        Text(
+                          '${s.translateCategory(chosen.category)} · ${s.translateColor(chosen.color)}',
+                          style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                        ),
                     ],
                   ),
                 ),
@@ -255,8 +361,7 @@ class _OutfitBuilderViewState extends State<OutfitBuilderView> {
                   IconButton(
                     icon: const Icon(Icons.close, size: 18),
                     color: Colors.grey,
-                    onPressed: () =>
-                        setState(() => _selected[label] = null),
+                    onPressed: () => setState(() => _single[slotKey] = null),
                   )
                 else
                   const Icon(Icons.add_circle_outline, color: Colors.grey),
@@ -268,13 +373,155 @@ class _OutfitBuilderViewState extends State<OutfitBuilderView> {
     );
   }
 
-  void _pickGarment(
+  // ── Sección de slot multi-prenda ────────────────────────────────────────────
+
+  Widget _buildMultiSlotSection(
+    BuildContext context, {
+    required String slotKey,
+    required String label,
+    required IconData icon,
+    required List<Garment> items,
+    required InventoryViewModel inventory,
+    required AppStrings s,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: items.isNotEmpty
+              ? colorScheme.primary.withValues(alpha: 0.07)
+              : Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: items.isNotEmpty
+                ? colorScheme.primary.withValues(alpha: 0.2)
+                : Colors.transparent,
+          ),
+        ),
+        child: Column(
+          children: [
+            // Cabecera del slot
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: items.isNotEmpty
+                      ? colorScheme.primary.withValues(alpha: 0.15)
+                      : Colors.grey.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon,
+                    size: 22,
+                    color: items.isNotEmpty ? colorScheme.primary : Colors.grey),
+              ),
+              title: Text(label,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[600],
+                      fontSize: 12)),
+              subtitle: items.isEmpty
+                  ? Text(s.tapToSelect,
+                      style: const TextStyle(color: Colors.grey))
+                  : null,
+              trailing: IconButton(
+                icon: Icon(Icons.add_circle_outline,
+                    color: colorScheme.primary),
+                tooltip: s.tapToSelect,
+                onPressed: () =>
+                    _pickMulti(context, slotKey, label, inventory, s),
+              ),
+            ),
+            // Lista de prendas seleccionadas
+            if (items.isNotEmpty)
+              ...items.map((g) => Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 52),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(g.name,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold)),
+                              Text(
+                                '${s.translateCategory(g.category)} · ${s.translateColor(g.color)}',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey[500]),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          color: Colors.grey,
+                          onPressed: () => setState(
+                              () => _multi[slotKey]!.remove(g)),
+                        ),
+                      ],
+                    ),
+                  )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Picker de prenda única ──────────────────────────────────────────────────
+
+  void _pickSingle(
     BuildContext context,
-    String slot,
+    String slotKey,
+    String slotLabel,
     InventoryViewModel inventory,
+    AppStrings s,
   ) {
+    _openPicker(
+      context: context,
+      slotKey: slotKey,
+      slotLabel: slotLabel,
+      inventory: inventory,
+      s: s,
+      onPick: (g) => setState(() => _single[slotKey] = g),
+    );
+  }
+
+  // ── Picker de prenda múltiple ───────────────────────────────────────────────
+
+  void _pickMulti(
+    BuildContext context,
+    String slotKey,
+    String slotLabel,
+    InventoryViewModel inventory,
+    AppStrings s,
+  ) {
+    _openPicker(
+      context: context,
+      slotKey: slotKey,
+      slotLabel: slotLabel,
+      inventory: inventory,
+      s: s,
+      onPick: (g) => setState(() => _multi[slotKey]!.add(g)),
+    );
+  }
+
+  // ── Bottom sheet de selección de prenda ────────────────────────────────────
+
+  void _openPicker({
+    required BuildContext context,
+    required String slotKey,
+    required String slotLabel,
+    required InventoryViewModel inventory,
+    required AppStrings s,
+    required void Function(Garment) onPick,
+  }) {
+    final allowedCats = _slotCategories[slotKey] ?? [];
     final available = inventory.garments
-        .where((g) => g.state != GarmentState.inWash)
+        .where((g) =>
+            g.state != GarmentState.inWash &&
+            (allowedCats.isEmpty || allowedCats.contains(g.category)))
         .toList();
 
     showModalBottomSheet(
@@ -286,34 +533,29 @@ class _OutfitBuilderViewState extends State<OutfitBuilderView> {
       builder: (ctx) {
         return DraggableScrollableSheet(
           expand: false,
-          initialChildSize: 0.5,
-          maxChildSize: 0.85,
+          initialChildSize: 0.55,
+          maxChildSize: 0.9,
           builder: (ctx, scrollCtrl) {
             return Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
               child: Column(
                 children: [
                   Container(
-                    width: 40,
-                    height: 4,
+                    width: 40, height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2)),
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    'Pick $slot',
-                    style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
+                  Text('${s.pickSlot} $slotLabel',
+                      style: Theme.of(ctx)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   Expanded(
                     child: available.isEmpty
-                        ? const Center(
-                            child: Text('No available garments'),
-                          )
+                        ? Center(child: Text(s.noAvailableGarments))
                         : ListView.separated(
                             controller: scrollCtrl,
                             itemCount: available.length,
@@ -326,17 +568,16 @@ class _OutfitBuilderViewState extends State<OutfitBuilderView> {
                                   backgroundColor: Theme.of(ctx)
                                       .colorScheme
                                       .primary
-                                      .withOpacity(0.1),
-                                  child: Icon(
-                                    Icons.checkroom,
-                                    color: Theme.of(ctx).colorScheme.primary,
-                                    size: 18,
-                                  ),
+                                      .withValues(alpha: 0.1),
+                                  child: Icon(Icons.checkroom,
+                                      color: Theme.of(ctx).colorScheme.primary,
+                                      size: 18),
                                 ),
                                 title: Text(g.name),
-                                subtitle: Text('${g.category} • ${g.color}'),
+                                subtitle: Text(
+                                    '${s.translateCategory(g.category)} · ${s.translateColor(g.color)}'),
                                 onTap: () {
-                                  setState(() => _selected[slot] = g);
+                                  onPick(g);
                                   Navigator.pop(ctx);
                                 },
                               );

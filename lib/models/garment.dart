@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 enum GarmentState { inCloset, inUse, inWash }
 
 class Garment {
