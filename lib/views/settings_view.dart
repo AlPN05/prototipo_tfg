@@ -8,7 +8,7 @@ import '../models/app_config.dart';
 class SettingsView extends StatelessWidget {
   const SettingsView({super.key});
 
-  static const String _appVersion = '1.0.2';
+  static const String _appVersion = '1.0.4';
 
   @override
   Widget build(BuildContext context) {
@@ -51,11 +51,17 @@ class SettingsView extends StatelessWidget {
                     underline: const SizedBox(),
                     items: [
                       DropdownMenuItem(
-                          value: ThemeMode.system, child: Text(s.themeSystem)),
+                        value: ThemeMode.system,
+                        child: Text(s.themeSystem),
+                      ),
                       DropdownMenuItem(
-                          value: ThemeMode.light, child: Text(s.themeLight)),
+                        value: ThemeMode.light,
+                        child: Text(s.themeLight),
+                      ),
                       DropdownMenuItem(
-                          value: ThemeMode.dark, child: Text(s.themeDark)),
+                        value: ThemeMode.dark,
+                        child: Text(s.themeDark),
+                      ),
                     ],
                     onChanged: (val) {
                       if (val != null) settings.setThemeMode(val);
@@ -96,19 +102,19 @@ class SettingsView extends StatelessWidget {
                 style: TextStyle(fontSize: 12),
               ),
               trailing: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primary
-                      .withValues(alpha: 0.1),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.3),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Text(
@@ -135,10 +141,10 @@ class SettingsView extends StatelessWidget {
       child: Text(
         title.toUpperCase(),
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: Colors.grey,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-            ),
+          color: Colors.grey,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+        ),
       ),
     );
   }
